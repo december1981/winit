@@ -1783,6 +1783,8 @@ mod modifiers_serde {
         pub control_key: bool,
         pub alt_key: bool,
         pub super_key: bool,
+        pub caps_lock_on: bool,
+        pub num_lock_on: bool,
     }
 
     impl Serialize for ModifiersState {
@@ -1795,6 +1797,9 @@ mod modifiers_serde {
                 control_key: self.control_key(),
                 alt_key: self.alt_key(),
                 super_key: self.super_key(),
+                caps_lock_on: self.caps_lock_on(),
+                num_lock_on: self.num_lock_on(),
+
             };
             s.serialize(serializer)
         }
@@ -1805,13 +1810,15 @@ mod modifiers_serde {
         where
             D: Deserializer<'de>,
         {
-            let ModifiersStateSerialize { shift_key, control_key, alt_key, super_key } =
+            let ModifiersStateSerialize { shift_key, control_key, alt_key, super_key, caps_lock_on, num_lock_on } =
                 ModifiersStateSerialize::deserialize(deserializer)?;
             let mut m = ModifiersState::empty();
             m.set(ModifiersState::SHIFT, shift_key);
             m.set(ModifiersState::CONTROL, control_key);
             m.set(ModifiersState::ALT, alt_key);
             m.set(ModifiersState::SUPER, super_key);
+            m.set(ModifiersState::CAPS_LOCK, caps_lock_on);
+            m.set(ModifiersState::NUM_LOCK, num_lock_on);
             Ok(m)
         }
     }
