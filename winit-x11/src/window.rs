@@ -384,6 +384,10 @@ pub struct SharedState {
     pub has_focus: bool,
     // Use `Option` to not apply hittest logic when it was never requested.
     pub cursor_hittest: Option<bool>,
+    // A `_NET_WM_SYNC_REQUEST` serial not yet acknowledged — held
+    // until the configure it announces has been delivered to the app (which
+    // draws the new size before returning), not acknowledged on receipt.
+    pub pending_sync: Option<x11rb::protocol::sync::Int64>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -423,6 +427,7 @@ impl SharedState {
             base_size: None,
             has_focus: false,
             cursor_hittest: None,
+            pending_sync: None,
         })
     }
 }

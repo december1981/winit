@@ -419,11 +419,16 @@ impl EventProcessor {
                 bytemuck::cast::<u32, i32>((xev.data.get_long(3) & 0xffffffff) as u32),
             );
 
-            self.target
-                .xconn
-                .xcb_connection()
-                .sync_set_counter(sync_counter_id, Int64 { lo, hi })
-                .expect_then_ignore_error("Failed to set XSync counter.");
+            // Hold the serial until the configure it announces
+            // has been handled (`configure_notify`). A serial still pending
+            // (its configure never came) is acknowledged now, so the WM
+            // never waits on it.
+            let window = self.with_window(xev.window as xproto::Window, Arc::clone);
+            let stale =
+                window.and_then(|w| w.shared_state_lock().pending_sync.replace(Int64 { lo, hi }));
+            if let Some(stale) = stale {
+                self.ack_sync(sync_counter_id, stale);
+            }
 
             return;
         }
@@ -861,6 +866,21 @@ impl EventProcessor {
             let event = WindowEvent::SurfaceResized(new_surface_size.into());
             app.window_event(&self.target, window_id, event);
         }
+
+        // The app has seen (and drawn) this size — let the WM go on.
+        let pending = window.shared_state_lock().pending_sync.take();
+        if let (Some(serial), Some(counter)) = (pending, window.sync_counter_id()) {
+            self.ack_sync(counter.get(), serial);
+        }
+    }
+
+    /// Acknowledge a `_NET_WM_SYNC_REQUEST` serial: set the window's sync
+    /// counter to it and flush, so the WM sees it now.
+    fn ack_sync(&self, counter: u32, serial: Int64) {
+        let conn = self.target.xconn.xcb_connection();
+        conn.sync_set_counter(counter, serial)
+            .expect_then_ignore_error("Failed to set XSync counter.");
+        let _ = x11rb::connection::Connection::flush(conn);
     }
 
     /// This is generally a reliable way to detect when the window manager's been
